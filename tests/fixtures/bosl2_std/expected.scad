@@ -10816,10 +10816,10 @@ function matrix_trace(M) =
 //   B = law_of_sines(a, A, b);
 //   b = law_of_sines(a, A, B=);
 // Description:
-//   Applies the Law of Sines for an arbitrary triangle.  Given two triangle side lengths and the
-//   reference angle between them, returns the reference angle of the corner opposite of the second side.  Given a side
-//   length, the opposing reference angle, and a second reference angle, returns the length of the side opposite of the
-//   second reference angle.
+//   Applies the Law of Sines for an arbitrary triangle.  Given side lengths `a` and `b` and the angle `A`
+//   opposite `a`, returns the principal angle `B` opposite `b`.  A supplementary solution `180-B` may also
+//   form a triangle when `A+(180-B)<180`.  Given `a`, its opposite angle `A`, and a second angle `B`,
+//   returns the side opposite `B`.  Impossible combinations of positive sides and angles produce an error.
 // Figure(2D;NoAxes;VPD=200;VPT=[0,25,0]):
 //   stroke([[-50,0], [10,60], [50,0]], closed=true, width=2);
 //   color("black") {
@@ -10843,8 +10843,13 @@ function law_of_sines(a, A, b, B) =
     //   a/sin(A) = b/sin(B) = c/sin(C)
     assert(num_defined([b,B]) == 1, "Must give exactly one of b= or B=.")
     let( r = a/sin(A) )
-    is_undef(b) ? r*sin(B) :
-    asin(constrain(b/r, -1, 1));
+    is_undef(b) ?
+        assert(!all_positive([a,A,B]) || A+B<180, "Triangle angles must sum to less than 180 degrees.")
+        r*sin(B) :
+    let(sinB = b/r, angleB = asin(constrain(sinB, -1, 1)))
+    assert(!all_positive([a,A,b]) || (A<180 && sinB<=1+_EPSILON && A+angleB<180),
+           "Side lengths and angle do not form a triangle.")
+    angleB;
 
 // Function: opp_ang_to_adj()
 // Synopsis: Returns the adjacent side length from the length of the opposite side and the reference reference angle.
@@ -11163,7 +11168,7 @@ function vector_axis(v1,v2=undef,v3=undef) =
 //   newv = vector_bisect(v1,v2);
 // Description:
 //   Returns a unit vector that exactly bisects the minor angle between two given vectors.
-//   If given two vectors that are directly opposed, returns `undef`.
+//   If the normalized vectors are approximately opposed, returns `undef`. Both inputs must be nonzero vectors of the same length.
 function vector_bisect(v1,v2) =
     assert(is_vector(v1))
     assert(is_vector(v2))
@@ -11171,12 +11176,7 @@ function vector_bisect(v1,v2) =
     assert(!approx(norm(v2),0), "\nZero length vector.")
     assert(len(v1)==len(v2), "\nVectors are of different sizes.")
     let( v1 = unit(v1), v2 = unit(v2) )
-    approx(v1,-v2)? undef :
-    let(
-        axis = vector_axis(v1,v2),
-        ang = vector_angle(v1,v2),
-        v3 = unit(rot(ang/2, v=axis, p=v1))
-    ) v3;
+    approx(v1,-v2)? undef : unit(v1+v2);
 
 // Function: furthest_point()
 // Synopsis: Finds the furthest point in a list of points.
@@ -11185,13 +11185,14 @@ function vector_bisect(v1,v2) =
 // Usage:
 //   index = furthest_point(pt, points);
 // Description:
-//   Given a list of `points`, finds the index of the furthest point from `pt`.
+//   Given a nonempty list, `points`, finds the index of the furthest member from `pt`.
+//   All points must have the same dimension as `pt`.
 // Arguments:
 //   pt = The point to find the farthest point from.
 //   points = The list of points to search.
 function furthest_point(pt, points) =
     assert( is_vector(pt), "\nInvalid point." )
-    assert(is_path(points,dim=len(pt)), "\nInvalid pointlist or incompatible dimensions." )
+    assert(is_matrix(points,undef,len(pt)), "\nInvalid pointlist or incompatible dimensions." )
     max_index([for (p=points) norm(p-pt)]);
 
 // Function: vector_search()
@@ -11205,17 +11206,15 @@ function furthest_point(pt, points) =
 //   finds the points in `target` that match each query point. A match holds when the 
 //   distance between a point in `target` and a query point is less than or equal to `r`. 
 //   The returned list contains a list for each query point containing, in arbitrary 
-//   order, the indices of all points that match that query point. 
+//   order, the indices of all points that match that query point.
+//   You can also give a single query point; in that case the result is a list of matching indices.
 //   The `target` may be a simple list of points or a search tree.
-//   When `target` is a large list of points, a search tree is constructed to 
-//   speed up the search with an order around O(log n) per query point. 
-//   For small point lists, a direct search is done dispensing a tree construction. 
-//   Alternatively, `target` may be a search tree built with `vector_search_tree()`.
-//   In that case, that tree is parsed looking for matches.
-//   An empty list of query points returns a empty output list.
-//   An empty list of target points returns a output list with an empty list for each query point.
+//   When `target` is a raw list of more than 400 points, a search tree is constructed for this call.
+//   Shorter raw lists are searched directly. Search cost depends on the data distribution and number of matches.
+//   Alternatively, `target` may be a prepared search structure built with {{vector_search_tree()}},
+//   which is faster for repeated searches since the structure is not rebuilt.  
 // Arguments:
-//   query = list of points to find matches for.
+//   query = A query point, or a list of query points to find matches for.
 //   r = the search radius.
 //   target = list of the points to search for matches or a search tree.
 // Example(2D,Med): A set of four queries to find points within 1 unit of the query.  The circles show the search region and all have radius 1.  
@@ -11298,8 +11297,9 @@ function _bt_search(query, r, points, tree) =
 //Ball tree construction
 function _bt_tree(points, ind, leafsize=25) =
     len(ind)<=leafsize ? [ind] :
-    let( 
-        bounds = pointlist_bounds(select(points,ind)),
+    let(bounds = pointlist_bounds(select(points,ind)))
+    bounds[0]==bounds[1] ? [ind] :
+    let(
         coord  = max_index(bounds[1]-bounds[0]), 
         projc  = [for(i=ind) points[i][coord] ],
         meanpr = mean(projc), 
@@ -11822,12 +11822,15 @@ function polar_to_xy(r,theta) =
 //   to perform 2D operations on a coplanar set of data.  After those operations are done you can return the data
 //   to 3D with `lift_plane()`.  You could also use this to force approximately coplanar data to be exactly coplanar.
 //   The parameter p can be a point, path, region, bezier patch or VNF.
+//   A VNF is returned as a VNF-like structure with 2D vertices.  This projected
+//   representation can be passed to {{lift_plane()}}, but is not a standard 3D VNF. An empty VNF is returned unchanged.
+//   Projection discards distance from the plane; lifting the result restores points on the plane, not their original depth.
 //   The plane can be specified as
 //   - A list of three points.  The planar coordinate system should have [0,0] at plane[0], with plane[1] lying on the Y+ axis.
 //   - A list of non-collinear, coplanar points that define a plane.
 //   - A plane definition `[A,B,C,D]` where `Ax+By+CZ=D`.  The closest point on that plane to the origin maps to the origin in the new coordinate system.
 //   .
-//   If you omit the point specification then `project_plane()` returns a rotation matrix that maps the specified plane to the XY plane.
+//   If you omit the point specification then `project_plane()` returns a transformation matrix that maps the specified plane to the XY plane.
 //   Note that if you apply this transformation to data lying on the plane, it produces 3D points with the Z coordinate of zero.
 // Arguments:
 //   plane = plane specification or point list defining the plane
@@ -11841,7 +11844,7 @@ function polar_to_xy(r,theta) =
 //   data = apply(M,path3d(circle(r=10, $fn=20)));
 //   move_copies(data) sphere(r=1);
 //   color("red") move_copies(project_plane(data, data)) sphere(r=1);
-// Example(3D,VPR=[70.40,0.00,18.70],VPD=292.71,VPT=[-3.65,16.28,13.46]): The arrows show the projection from the red circle to its projection in yellow.  Since we didn't use {{path3d()}} the projected curve is still a 3D curve with zero $z$ component.  
+// Example(3D,VPR=[70.40,0.00,18.70],VPD=292.71,VPT=[-3.65,16.28,13.46]): The arrows show the projection from the red circle to its projection in yellow.  Since we didn't use {{path2d()}} the projected curve is still a 3D curve with zero $z$ component.  
 //   xyzpath = move([10,20,30], p=yrot(25, p=path3d(circle(d=100))));
 //   mat = project_plane(xyzpath);
 //   xypath = apply(mat, xyzpath);
@@ -11859,7 +11862,7 @@ function project_plane(plane,p) =
               y = unit(plane[1]-plane[0]),        // y axis goes to point b
               x = unit(v-(v*y)*y)   // x axis 
           )            
-          frame_map(x,y) * move(-plane[0])
+          frame_map(x,y,reverse=true) * move(-plane[0])
     : is_vector(plane,4) && is_undef(p) ?            // no data, plane given in "plane"
           assert(_valid_plane(plane), "\nPlane is not valid.")
           let(
@@ -11873,7 +11876,7 @@ function project_plane(plane,p) =
           assert(is_def(plane), "\nPoint list is not coplanar.")
           project_plane(plane)
     : assert(is_def(p), str("Invalid plane specification: ",plane))
-      is_vnf(p) ? [project_plane(plane,p[0]), p[1]] 
+      is_vnf(p) ? (p[0]==[] ? p : [project_plane(plane,p[0]), p[1]])
     : is_list(p) && is_list(p[0]) && is_vector(p[0][0],3) ?  // bezier patch or region
            [for(plist=p) project_plane(plane,plist)]
     : assert(is_vector(p,3) || is_path(p,3), str("\nData must be a 3D point, path, region, vnf, or bezier patch."))
@@ -11898,17 +11901,19 @@ function project_plane(plane,p) =
 //   M =  lift_plane(plane);
 // Description:
 //   Converts the given 2D point on the plane to 3D coordinates of the specified plane.
-//   The parameter p can be a point, path, region, bezier patch or VNF.
+//   The parameter `p` can be a 2D point, path, region, bezier patch, or a projected VNF (a VNF with 2d vertices)
+//   returned by {{project_plane()}}. 
+//   Lifting a projection does not recover any distance from the plane that was discarded during projection.
 //   The plane can be specified as
 //   - A list of three points.  The planar coordinate system will have [0,0] at plane[0], with plane[1] lying on the Y+ axis.
 //   - A list of non-collinear, coplanar points that define a plane.
 //   - A plane definition `[A,B,C,D]` where `Ax+By+CZ=D`.  The closest point on that plane to the origin maps to the origin in the new coordinate system.
 //   .
 //   If you do not supply `p` then you get a transformation matrix that operates in 3D, assuming that the Z coordinate of the points is zero.
-//   This matrix is a rotation, the inverse of the one produced by project_plane.
+//   This rotation matrix is the inverse of the one produced by {{project_plane()}}.
 // Arguments:
 //   plane = Plane specification or list of points to define a plane
-//   p = points, path, region, VNF, or bezier patch to transform.
+//   p = 2D point, path, region, projected VNF, or bezier patch to transform.
 function lift_plane(plane, p) =
       is_matrix(plane,3,3) && is_undef(p) ? // no data, 3 p given
           let(
@@ -11916,7 +11921,7 @@ function lift_plane(plane, p) =
               y = unit(plane[1]-plane[0]),        // y axis goes to point b
               x = unit(v-(v*y)*y)   // x axis 
           )            
-          move(plane[0]) * frame_map(x,y,reverse=true)
+          move(plane[0]) * frame_map(x,y)
     : is_vector(plane,4) && is_undef(p) ?            // no data, plane given in "plane"
           assert(_valid_plane(plane), "\nPlane is not valid.")
           let(
@@ -11929,10 +11934,10 @@ function lift_plane(plane, p) =
           let(plane = plane_from_points(plane, check_coplanar=true))
           assert(is_def(plane), "Point list is not coplanar")
           lift_plane(plane)
-    : is_vnf(p) ? [lift_plane(plane,p[0]), p[1]] 
-    : is_list(p) && is_list(p[0]) && is_vector(p[0][0],3) ?  // bezier patch or region
+    : _is_projected_vnf(p) ? (p[0]==[] ? p : [apply(lift_plane(plane),path3d(p[0])), p[1]])
+    : is_list(p) && is_list(p[0]) && is_vector(p[0][0],2) ?  // bezier patch or region
            [for(plist=p) lift_plane(plane,plist)]
-    : assert(is_vector(p,2) || is_path(p,2),"\nData must be a 2D point, path, region, vnf, or bezier patch.")
+    : assert(is_vector(p,2) || is_path(p,2),"\nData must be a 2D point, path, region, projected VNF, or bezier patch.")
       is_matrix(plane,3,3) ?
           let(
               v = plane[2]-plane[0],
@@ -11940,6 +11945,13 @@ function lift_plane(plane, p) =
               x = unit(v-(v*y)*y)  // x axis 
           ) move(plane[0],p * [x,y])
     : apply(lift_plane(plane),is_vector(p) ? point3d(p) : path3d(p));
+
+/// Recognize the 2D vertex/face representation without broadening is_vnf().
+/// Polygon faces have at least three indices, unlike the coordinate pairs in a 2D region or patch.
+function _is_projected_vnf(x) =
+    is_list(x) && len(x)==2 && is_list(x[0]) && is_list(x[1])
+    && (x[0]==[] ? x[1]==[] : is_matrix(x[0],undef,2))
+    && (x[1]==[] || (is_vector(x[1][0]) && len(x[1][0])>=3));
 
 // Function: cylindrical_to_xyz()
 // Synopsis: Convert cylindrical coordinates to cartesian coordinates. 
@@ -15774,7 +15786,7 @@ function _vnf_find_corner_faces(vnf,corner) =
 
 // Section: struct operations
 //
-// A struct is a data structure that associates arbitrary keys (of any type) with values (of any type).
+// A struct is a data structure that associates keys with defined values.
 // Structures are implemented as lists of [key, value] pairs.
 //
 // An empty list `[]` is an empty structure and can be used wherever a structure input is required.
@@ -15793,8 +15805,8 @@ function _vnf_find_corner_faces(vnf,corner) =
 //   that is also an error.  Note that key order will change when you change a key's value.
 // Arguments:
 //   struct = input structure.
-//   key = key to set or list of key,value pairs to set
-//   value = value to set the key to (when giving a single key and value)
+//   key = Key to set, or a flat alternating list `[key1,value1,key2,value2,...]`.
+//   value = Value to store when giving a single key and value.
 //   ---
 //   grow = Set to true to allow structure to grow, or false for new keys to generate an error.  Default: true
 // Example: Create a struct containing just one key-value pair
@@ -15831,7 +15843,7 @@ function _format_key(key) = is_string(key) ? str("\"",key,"\""): key;
 // Topics: Data Structures, Dictionaries
 // See Also: struct_set(), struct_remove(), struct_val(), struct_keys(), echo_struct(), is_struct()
 // Usage:
-//   val = struct_val(struct, key, default);
+//   val = struct_val(struct, key, [default]);
 // Description:
 //   Returns the value for the specified key in the structure, or default value if the key is not present
 // Arguments:
