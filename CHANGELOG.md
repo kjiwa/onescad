@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 Add `--minify`, which strips comments and indentation from the bundle after the Customizer
 parameters.
