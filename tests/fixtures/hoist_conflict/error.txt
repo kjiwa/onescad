@@ -1,0 +1,1 @@
+reads 'b' before its first assignment

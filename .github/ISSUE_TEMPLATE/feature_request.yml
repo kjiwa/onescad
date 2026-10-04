@@ -1,0 +1,18 @@
+name: Feature request
+description: Propose a change to onescad's behavior or CLI.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What you are trying to do that onescad does not support today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What you would like to see, and why it fits bundling one model into one file.
+    validations:
+      required: true

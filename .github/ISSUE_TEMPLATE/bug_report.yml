@@ -1,0 +1,32 @@
+name: Bug report
+description: onescad fails on a model or produces a bundle that renders differently.
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The command you ran, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: onescad version
+      description: Output of `onescad --version`.
+    validations:
+      required: true
+  - type: input
+    id: openscad
+    attributes:
+      label: OpenSCAD version
+      description: Output of `openscad --version`, if the bug involves rendering or `--verify`.
+    validations:
+      required: false
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: A small .scad model that triggers the bug, if you can share one.
+    validations:
+      required: false

@@ -1,0 +1,1 @@
+external import is read at render time and cannot be verified from the bundle's location
