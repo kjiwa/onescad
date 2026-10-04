@@ -1,0 +1,60 @@
+name: check
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.11', '3.14']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: true
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - run: uv sync --locked --python ${{ matrix.python-version }}
+      - run: uv run ruff check
+      - run: uv run ruff format --check
+      - run: uv run mypy
+      - run: uv run pytest
+
+  oracle:
+    runs-on: ubuntu-latest
+    env:
+      OPENSCAD_VERSION: '2026.09.23'
+      OPENSCAD_SHA256: 033762f4e0b0de7a2c6cf2b5a12febb29d60ba62ede227d57b1c8b675a94710a
+      APPIMAGE_EXTRACT_AND_RUN: '1'
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: true
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - name: Install OpenSCAD
+        run: |
+          curl -fsSL -o openscad "https://files.openscad.org/snapshots/OpenSCAD-${OPENSCAD_VERSION}-x86_64.AppImage"
+          echo "${OPENSCAD_SHA256}  openscad" | sha256sum -c -
+          chmod +x openscad
+          mkdir -p "$HOME/.local/bin"
+          mv openscad "$HOME/.local/bin/openscad"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - run: openscad --version
+      - run: uv sync --locked
+      - run: uv run pytest -m oracle --no-cov
+
+  release-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+      - run: uv build
+      - run: uvx twine check dist/*
+      - run: uvx zizmor==1.30.1 .github/workflows
