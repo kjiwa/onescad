@@ -54,17 +54,22 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help="render the source and the bundle with openscad and compare them",
     )
+    parser.add_argument(
+        "--minify",
+        action="store_true",
+        help="strip comments and indentation after the Customizer parameters",
+    )
     parser.add_argument("--version", action="version", version=f"onescad {__version__}")
     return parser
 
 
-def _build(source: Path, libs: Sequence[Path], output: Path) -> Bundle:
+def _build(source: Path, libs: Sequence[Path], output: Path, minify: bool) -> Bundle:
     graph = load(source, libs, os.environ)
     refs = resolve(graph)
     plan = plan_hoist(graph, refs)
     search = [p.resolve() for p in library_dirs(libs, os.environ)]
     roots = [graph.main.root.parent, *search]
-    emission = emit(graph, refs, plan, roots)
+    emission = emit(graph, refs, plan, roots, minify)
     presets = find_presets(graph.main.root)
     warnings = list(emission.warnings)
     if presets:
@@ -114,7 +119,7 @@ def _run(args: argparse.Namespace) -> int:
         raise BundleError("the output would overwrite the input")
     if args.verify and not openscad_available():
         raise BundleError("--verify needs openscad on PATH")
-    bundle = _build(source, args.library, output)
+    bundle = _build(source, args.library, output, args.minify)
     for warning in bundle.warnings:
         print(f"onescad: warning: {warning}", file=sys.stderr)
     _check_presets_target(bundle, output)

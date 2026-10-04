@@ -36,6 +36,28 @@ def test_a_bundle_is_written_with_its_header(
     assert capsys.readouterr().out == ""
 
 
+def test_minify_strips_comments_after_the_sentinel_and_keeps_the_rest(tmp_path: Path) -> None:
+    source = model(
+        tmp_path,
+        {
+            "m.scad": MODEL.replace("cube(", "// build it\n    cube("),
+            "lib.scad": "// helper docs\n" + LIB,
+        },
+    )
+    plain, small = tmp_path / "plain.scad", tmp_path / "small.scad"
+    assert main([str(source), "-o", str(plain)]) == 0
+    assert main([str(source), "-o", str(small), "--minify"]) == 0
+    text = small.read_text()
+    head, _, body = text.partition("/* [Hidden] */")
+    assert "// A model." in head
+    assert "/* [Size] */" in head
+    assert "w = 10; // [1:20]" in head
+    assert "//" not in body
+    assert "/*" not in body
+    assert "    " not in body
+    assert len(text) < len(plain.read_text())
+
+
 def test_presets_are_copied_next_to_the_bundle_and_inert_keys_warn(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
