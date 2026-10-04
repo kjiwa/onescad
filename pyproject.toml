@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "onescad"
-version = "0.0.0"
+version = "0.1.0"
 description = "Bundle an OpenSCAD model into one customizer-ready file"
 readme = "README.md"
 license = "MIT"
