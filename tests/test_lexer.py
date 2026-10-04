@@ -41,12 +41,12 @@ def test_crlf_is_preserved() -> None:
     assert "".join(t.text for t in lex(source)) == source
 
 
-@pytest.mark.parametrize("text", ["1", "1.", ".5", "1.5e-3", "2E+4", "10"])
+@pytest.mark.parametrize("text", ["1", "1.", ".5", "1.5e-3", "2E+4", "10", "0x1F", "0xff"])
 def test_numbers(text: str) -> None:
     assert significant(text) == [(Kind.NUMBER, text)]
 
 
-@pytest.mark.parametrize("text", ["3d", "1e", "2x3", "$fn", "_a", "$vpt"])
+@pytest.mark.parametrize("text", ["3d", "1e", "2x3", "$fn", "_a", "$vpt", "0X1f", "0xg"])
 def test_identifiers(text: str) -> None:
     assert significant(text) == [(Kind.IDENT, text)]
 

@@ -16,7 +16,9 @@ def sexp(node: object) -> str:
     if isinstance(node, ast.Node):
         parts = [type(node).__name__]
         parts += [
-            sexp(getattr(node, f.name)) for f in fields(node) if f.name not in ("start", "end")
+            sexp(getattr(node, f.name))
+            for f in fields(node)
+            if f.name not in ("start", "end", "name_start")
         ]
         return "(" + " ".join(parts) + ")"
     if isinstance(node, tuple):

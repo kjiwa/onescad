@@ -147,13 +147,20 @@ class _Parser:
             return self._block(start, modifiers)
         if self._is("if"):
             return self._if(start, modifiers)
+        name_start = self._peek().start
         name = self._ident()
         if not self._is("("):
             raise self._fail("expected statement")
         args = self._args()
         child = self._stmt()
         return ast.ModuleCall(
-            start=start, end=self._prev_end, name=name, args=args, child=child, modifiers=modifiers
+            start=start,
+            end=self._prev_end,
+            name=name,
+            name_start=name_start,
+            args=args,
+            child=child,
+            modifiers=modifiers,
         )
 
     def _block(self, start: int, modifiers: str) -> ast.Block:

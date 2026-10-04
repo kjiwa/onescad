@@ -47,7 +47,7 @@ _LINE_COMMENT = re.compile(r"//[^\n]*")
 _BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
 # OpenSCAD's lexer is flex: longest match wins and ties go to the earlier rule, so `3d` is an
 # identifier while `3` and `2e3` are numbers.
-_NUMBER = re.compile(r"(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?")
+_NUMBER = re.compile(r"0x[0-9a-fA-F]+|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?")
 _IDENT = re.compile(r"\$?[A-Za-z0-9_]+")
 _STRING = re.compile(r'"(?:[^"\\]|\\.)*"', re.DOTALL)
 _PATH = re.compile(r"<[^\t\r\n>]*>")

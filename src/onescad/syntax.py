@@ -206,6 +206,7 @@ class ModuleCall(Stmt):
     `child` is an `Empty` for a bare `;`."""
 
     name: str
+    name_start: int
     args: tuple[Arg, ...]
     child: Stmt
     modifiers: str
