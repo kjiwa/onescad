@@ -1,0 +1,3 @@
+[submodule "tests/corpus/BOSL2"]
+	path = tests/corpus/BOSL2
+	url = https://github.com/BelfrySCAD/BOSL2
