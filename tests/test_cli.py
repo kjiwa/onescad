@@ -7,6 +7,7 @@ import onescad
 from helpers import HAS_OPENSCAD, write
 from onescad import cli
 from onescad.cli import main
+from onescad.errors import BundleError
 
 MODEL = "// A model.\nuse <lib.scad>\n/* [Size] */\nw = 10; // [1:20]\ncube(helper(w));\n"
 LIB = "function helper(x) = x * 2;\n"
@@ -149,3 +150,29 @@ def test_verify_passes_for_a_faithful_bundle(tmp_path: Path) -> None:
     source = model(tmp_path)
     source.with_suffix(".json").write_text(json.dumps(PRESETS))
     assert main([str(source), "-o", str(tmp_path / "dist" / "m.scad"), "--verify"]) == 0
+
+
+@pytest.mark.parametrize("out_name", ["m", "m.json"])
+def test_a_presets_copy_that_would_overwrite_a_file_is_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], out_name: str
+) -> None:
+    source = model(tmp_path)
+    presets = source.with_suffix(".json")
+    presets.write_text(json.dumps(PRESETS))
+    assert main([str(source), "-o", str(source.parent / out_name)]) == 1
+    assert "overwrite" in capsys.readouterr().err
+    assert presets.read_text() == json.dumps(PRESETS)
+
+
+def test_a_failed_verify_leaves_no_bundle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def fail(*_args: object) -> None:
+        raise BundleError("differs")
+
+    monkeypatch.setattr(cli, "openscad_available", lambda: True)
+    monkeypatch.setattr(cli, "verify", fail)
+    out = tmp_path / "dist" / "m.scad"
+    assert main([str(model(tmp_path)), "-o", str(out), "--verify"]) == 1
+    assert not out.exists()
+    assert "differs" in capsys.readouterr().err

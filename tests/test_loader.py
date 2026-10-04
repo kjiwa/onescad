@@ -232,3 +232,9 @@ def test_bosl2_std_loads_with_corpus_on_the_search_path(tmp_path: Path) -> None:
     root = CORPUS.resolve() / "BOSL2" / "std.scad"
     assert root in graph.main.files
     assert any(n.root.name == "builtins.scad" for n in graph.used)
+
+
+def test_a_byte_order_mark_is_ignored(tmp_path: Path) -> None:
+    path = tmp_path / "m.scad"
+    path.write_bytes(b"\xef\xbb\xbfx = 1;\n")
+    assert load(path, [], {}).files[path.resolve()].source == "x = 1;\n"

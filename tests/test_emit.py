@@ -100,6 +100,12 @@ def test_fonts_and_external_files_are_reported(tmp_path: Path) -> None:
     assert len(out.warnings) == 3
 
 
+def test_a_user_defined_import_is_not_an_external_file_read(tmp_path: Path) -> None:
+    out = bundle_body(tmp_path, {"m.scad": 'module import(f) cube(1);\nimport("a.stl");\n'})
+    assert out.external_files == ()
+    assert out.warnings == ()
+
+
 def test_a_variable_of_a_used_file_warns(tmp_path: Path) -> None:
     out = bundle_body(tmp_path, {"m.scad": "use <lib.scad>\nx = helper(1);\n", "lib.scad": LIB})
     assert any("'k' of a used file" in w for w in out.warnings)

@@ -95,7 +95,7 @@ class _Loader:
     def _read(self, path: Path) -> SourceFile:
         if path not in self._files:
             try:
-                source = path.read_bytes().decode("utf-8")
+                source = path.read_bytes().decode("utf-8-sig")
             except (OSError, UnicodeDecodeError) as e:
                 raise LoadError(f"{path}: cannot read: {e}") from e
             try:

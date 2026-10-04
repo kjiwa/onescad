@@ -78,7 +78,7 @@ def emit(graph: Graph, refs: Resolution, plan: HoistPlan, roots: Sequence[Path])
     blocks = [block for stream in streams for block in writer.blocks(stream)]
     sections = [plan.render(), SENTINEL, "\n\n".join(blocks) + "\n"]
     text = "\n".join(section for section in sections if section)
-    calls = _scan_calls(text)
+    calls = _scan_calls(text, _defined_names(graph))
     return Emission(
         text=text,
         files=tuple(writer.files),
@@ -252,8 +252,18 @@ class _Calls:
     warnings: tuple[str, ...]
 
 
-def _scan_calls(text: str) -> _Calls:
-    """Fonts named by `font=` strings, and files read by `import()` or `surface()`."""
+def _defined_names(graph: Graph) -> frozenset[str]:
+    return frozenset(
+        stmt.name
+        for file in graph.files.values()
+        for stmt in file.tree.stmts
+        if isinstance(stmt, ast.FunctionDef | ast.ModuleDef)
+    )
+
+
+def _scan_calls(text: str, defined: frozenset[str]) -> _Calls:
+    """Fonts named by `font=` strings, and files read by `import()` or `surface()` unless the
+    model defines a function or module of that name."""
     tokens = [t for t in lex(text) if t.kind not in TRIVIA]
     fonts: set[str] = set()
     files: list[str] = []
@@ -261,7 +271,12 @@ def _scan_calls(text: str) -> _Calls:
         following = tokens[i + 1 : i + 5]
         if token.kind is Kind.IDENT and token.text == "font" and _is_string_after(following, "="):
             fonts.add(following[1].text[1:-1])
-        elif token.text in _EXTERNAL_FILE_CALLS and following and following[0].text == "(":
+        elif (
+            token.text in _EXTERNAL_FILE_CALLS
+            and token.text not in defined
+            and following
+            and following[0].text == "("
+        ):
             files.append(_external_file(following[1:]))
     warnings = tuple(f"the bundle reads the external file {name} at render time" for name in files)
     return _Calls(tuple(sorted(fonts)), tuple(files), warnings)

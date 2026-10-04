@@ -3,6 +3,7 @@
 import argparse
 import os
 import sys
+import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -83,11 +84,27 @@ def _build(source: Path, libs: Sequence[Path], output: Path) -> Bundle:
     return Bundle(text, emission, presets, tuple(warnings))
 
 
+def _check_presets_target(bundle: Bundle, output: Path) -> None:
+    if not bundle.presets:
+        return
+    target = output.with_suffix(".json").resolve()
+    if target in (bundle.presets.resolve(), output.resolve()):
+        raise BundleError(f"the presets copy would overwrite {target.name}; choose another output")
+
+
 def _write(bundle: Bundle, output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(bundle.text, encoding="utf-8")
     if bundle.presets:
         copy_presets(bundle.presets, output.with_suffix(".json"))
+
+
+def _verify(source: Path, bundle: Bundle, output: Path, libs: Sequence[Path]) -> None:
+    with tempfile.TemporaryDirectory() as scratch:
+        candidate = Path(scratch) / output.name
+        candidate.write_text(bundle.text, encoding="utf-8")
+        search = library_dirs([p.resolve() for p in libs], os.environ)
+        verify(source, candidate, search, bundle.emission.renamed, bundle.presets)
 
 
 def _run(args: argparse.Namespace) -> int:
@@ -100,10 +117,10 @@ def _run(args: argparse.Namespace) -> int:
     bundle = _build(source, args.library, output)
     for warning in bundle.warnings:
         print(f"onescad: warning: {warning}", file=sys.stderr)
-    _write(bundle, output)
+    _check_presets_target(bundle, output)
     if args.verify:
-        libs = library_dirs([p.resolve() for p in args.library], os.environ)
-        verify(source, output.resolve(), libs, bundle.emission.renamed, bundle.presets)
+        _verify(source, bundle, output, args.library)
+    _write(bundle, output)
     return OK
 
 
