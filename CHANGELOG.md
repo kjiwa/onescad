@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+Add `--minify`, which strips comments and indentation from the bundle after the Customizer
+parameters.
+
 ## 0.1.0
 
 First release. `onescad INPUT -o OUTPUT [-L DIR]... [--verify]` bundles an OpenSCAD model and

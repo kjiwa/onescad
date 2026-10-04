@@ -13,6 +13,7 @@ from onescad.customizer import HoistPlan
 from onescad.flatten import Definition, Entry, Piece, RefIndex, Stream, flatten_graph
 from onescad.lexer import TRIVIA, Kind, Token, lex
 from onescad.loader import Graph, SourceFile, includes_in
+from onescad.minify import minify
 from onescad.rename import Renames, plan_renames
 from onescad.resolver import Kind as RefKind
 from onescad.resolver import Resolution, TopLevel
@@ -66,8 +67,15 @@ def leading_block(source: str) -> str:
     return neutralize(gap)
 
 
-def emit(graph: Graph, refs: Resolution, plan: HoistPlan, roots: Sequence[Path]) -> Emission:
-    """`roots` are the directories files are named relative to in `// onescad:` markers."""
+def emit(
+    graph: Graph,
+    refs: Resolution,
+    plan: HoistPlan,
+    roots: Sequence[Path],
+    minify_body: bool = False,
+) -> Emission:
+    """`roots` are the directories files are named relative to in `// onescad:` markers.
+    `minify_body` strips comments and indentation after the sentinel."""
     streams = flatten_graph(graph, plan)
     index = RefIndex(refs, graph)
     main_file = graph.main.root
@@ -76,7 +84,8 @@ def emit(graph: Graph, refs: Resolution, plan: HoistPlan, roots: Sequence[Path])
     renames = plan_renames(streams, kept, hoisted, index, graph.files)
     writer = _Writer(index, renames, kept, roots, main_file)
     blocks = [block for stream in streams for block in writer.blocks(stream)]
-    sections = [plan.render(), SENTINEL, "\n\n".join(blocks) + "\n"]
+    body = "\n\n".join(blocks) + "\n"
+    sections = [plan.render(), SENTINEL, minify(body) if minify_body else body]
     text = "\n".join(section for section in sections if section)
     calls = _scan_calls(text, _defined_names(graph))
     return Emission(

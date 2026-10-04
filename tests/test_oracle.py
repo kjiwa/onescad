@@ -103,3 +103,11 @@ def test_a_risky_model_warns(case: str, tmp_path: Path, capsys: pytest.CaptureFi
 def test_the_bundle_renders_like_its_source(case: str, tmp_path: Path) -> None:
     code, _ = run(case, tmp_path, "dist", "--verify")
     assert code == 0
+
+
+@pytest.mark.oracle
+@pytest.mark.skipif(not HAS_OPENSCAD, reason="needs openscad")
+@pytest.mark.parametrize("case", VERIFIABLE)
+def test_the_minified_bundle_renders_like_its_source(case: str, tmp_path: Path) -> None:
+    code, _ = run(case, tmp_path, "dist", "--verify", "--minify")
+    assert code == 0

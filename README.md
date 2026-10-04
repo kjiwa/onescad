@@ -13,7 +13,7 @@ no runtime dependencies.
 ## Usage
 
 ```
-onescad INPUT -o OUTPUT [-L DIR]... [--verify] [--version]
+onescad INPUT -o OUTPUT [-L DIR]... [--minify] [--verify] [--version]
 ```
 
 | Option | Meaning |
@@ -21,6 +21,7 @@ onescad INPUT -o OUTPUT [-L DIR]... [--verify] [--version]
 | `INPUT` | The model's `.scad` file. |
 | `-o`, `--output` | The bundle to write. Parent directories are created. |
 | `-L`, `--library DIR` | A directory to search for `include` and `use`; repeatable. |
+| `--minify` | Strip comments and indentation after the Customizer parameters. |
 | `--verify` | Render the source and the bundle with `openscad` and compare them. |
 | `--version` | Print the version. |
 
@@ -59,6 +60,11 @@ The output has these parts, in order:
 4. Each used file's definitions, dependencies first, each preceded by a `// onescad: <path>` marker
    and the file's leading comment.
 5. The main file, with its included files spliced in.
+
+`--minify` removes comments, blank lines, and indentation from parts 4 and 5, keeping one line
+break where the source had any; on BOSL2 it cuts the bundle by about two thirds. The header and
+the Customizer parameters are kept, so the licenses and the Customizer's descriptions survive.
+Identifiers are not renamed.
 
 The output has no timestamps, so the same input gives byte-identical output.
 
