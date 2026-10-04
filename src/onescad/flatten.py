@@ -6,13 +6,13 @@ Instantiations of a used namespace never run, so they are dropped.
 """
 
 from bisect import bisect_left
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
 from onescad import syntax as ast
 from onescad.customizer import HoistPlan
-from onescad.loader import Graph, Namespace, SourceFile
+from onescad.loader import Graph, Namespace, SourceFile, includes_in
 from onescad.resolver import Kind, Local, Ref, Resolution, Target, TopLevel, Unresolved, flatten
 
 _NOT_INSTANTIATIONS = (ast.Assign, ast.FunctionDef, ast.ModuleDef, ast.Use, ast.Include, ast.Empty)
@@ -71,20 +71,43 @@ class Occurrence:
 
 
 class RefIndex:
-    def __init__(self, refs: Resolution) -> None:
+    def __init__(self, refs: Resolution, graph: Graph) -> None:
         by_file: dict[Path, list[tuple[Ref, frozenset[Target]]]] = {}
         for ref, targets in refs.items():
             by_file.setdefault(ref.file, []).append((ref, targets))
         self._refs = {p: sorted(found, key=lambda r: r[0].start) for p, found in by_file.items()}
         self._starts = {p: [r.start for r, _ in found] for p, found in self._refs.items()}
+        self._graph = graph
+
+    def target(self, source: SourceFile, include: ast.Include) -> SourceFile:
+        return self._graph.included(source.path, include)
+
+    def nested_sources(self, piece: Piece) -> list[SourceFile]:
+        """The files spliced in by includes inside the statement, transitively."""
+        return self._spliced(piece.source, includes_in([piece.stmt]))
+
+    def _spliced(self, source: SourceFile, includes: Iterable[ast.Include]) -> list[SourceFile]:
+        found: list[SourceFile] = []
+        for include in includes:
+            target = self.target(source, include)
+            found.append(target)
+            found.extend(self._spliced(target, includes_in(target.tree.stmts)))
+        return found
 
     def occurrences(self, stream: Stream, piece: Piece) -> list[Occurrence]:
-        path = piece.source.path
-        found = self._refs.get(path, [])
+        """References inside the statement, including those of files it includes."""
+        found = self.within(stream, piece.source.path, piece.stmt.start, piece.stmt.end)
+        for target in self.nested_sources(piece):
+            found.extend(self.within(stream, target.path, 0, len(target.source)))
+        return found
+
+    def within(self, stream: Stream, path: Path, start: int, end: int) -> list[Occurrence]:
+        """References of one file in the character range."""
+        refs = self._refs.get(path, [])
         starts = self._starts.get(path, [])
-        lo = bisect_left(starts, piece.stmt.start)
-        hi = bisect_left(starts, piece.stmt.end)
-        return [_occurrence(stream, ref, targets) for ref, targets in found[lo:hi]]
+        lo = bisect_left(starts, start)
+        hi = bisect_left(starts, end)
+        return [_occurrence(stream, ref, targets) for ref, targets in refs[lo:hi]]
 
 
 def _occurrence(stream: Stream, ref: Ref, targets: frozenset[Target]) -> Occurrence:

@@ -36,6 +36,9 @@ class Graph:
     files: dict[Path, SourceFile] = field(default_factory=dict)
     links: dict[tuple[Path, int], Path] = field(default_factory=dict)
 
+    def included(self, file: Path, stmt: ast.Include) -> SourceFile:
+        return self.files[self.links[(file, stmt.start)]]
+
     def splice(
         self, file: Path, stmts: Iterable[ast.Stmt]
     ) -> Iterator[tuple[SourceFile, ast.Stmt]]:
@@ -63,6 +66,15 @@ def _nested(stmt: ast.Stmt) -> tuple[ast.Stmt, ...]:
     if isinstance(stmt, ast.If):
         return (stmt.then,) if stmt.otherwise is None else (stmt.then, stmt.otherwise)
     return ()
+
+
+def includes_in(stmts: Iterable[ast.Stmt]) -> Iterator[ast.Include]:
+    """Every include in `stmts` at any depth, without following into the included files."""
+    for stmt in stmts:
+        if isinstance(stmt, ast.Include):
+            yield stmt
+        else:
+            yield from includes_in(_nested(stmt))
 
 
 class _Loader:

@@ -12,7 +12,7 @@ from onescad.shake import shake
 def kept(tmp_path: Path, files: dict[str, str]) -> set[tuple[str, Kind, str]]:
     graph, refs, plan = analyze(tmp_path, files)
     streams = flatten_graph(graph, plan)
-    found = shake(streams, RefIndex(refs), graph.main.root)
+    found = shake(streams, RefIndex(refs, graph), graph.main.root)
     return {(k.namespace.name, k.kind, k.name) for k in found}
 
 
@@ -83,5 +83,5 @@ def test_a_dynamic_assignment_in_an_unused_file_is_ignored(tmp_path: Path) -> No
 
 def test_keys_are_top_level_targets(tmp_path: Path) -> None:
     graph, refs, plan = analyze(tmp_path, {"m.scad": "a = 1 + 1;\n"})
-    found = shake(flatten_graph(graph, plan), RefIndex(refs), graph.main.root)
+    found = shake(flatten_graph(graph, plan), RefIndex(refs, graph), graph.main.root)
     assert found == {TopLevel(graph.main.root, Kind.VARIABLE, "a")}

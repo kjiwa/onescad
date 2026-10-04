@@ -103,6 +103,8 @@ def _gather(
             occurrences.extend(index.occurrences(stream, scanned))
             for piece in shown:
                 words.update(_WORDS.findall(piece.source.source[piece.stmt.start : piece.stmt.end]))
+                for target in index.nested_sources(piece):
+                    words.update(_WORDS.findall(target.source))
     return occurrences, words
 
 

@@ -152,3 +152,41 @@ def test_bundle_renders_like_the_source(tmp_path: Path, case: str) -> None:
 def test_analyze_returns_the_hoist_plan(tmp_path: Path) -> None:
     _, _, plan = analyze(tmp_path, {"m.scad": "w = 1;\n"})
     assert [p.name for p in plan.params] == ["w"]
+
+
+@pytest.mark.parametrize(
+    "site",
+    [
+        "module m() {\n  include <i.scad>\n}\nm();\n",
+        "module m() include <i.scad>\nm();\n",
+        "if (true) {\n  include <i.scad>\n}\n",
+        "translate([0, 0, 0]) {\n  include <i.scad>\n}\n",
+        "module m() {\n  if (true) include <i.scad>\n}\nm();\n",
+    ],
+)
+def test_an_include_below_the_top_level_is_spliced_and_its_references_kept(
+    tmp_path: Path, site: str
+) -> None:
+    files = {
+        "m.scad": "use <lib.scad>\n" + site,
+        "lib.scad": "function helper(x) = x;\nfunction spare() = 1;\n",
+        "i.scad": "cube(helper(1));\n",
+    }
+    text = bundle_body(tmp_path, files).text
+    assert "include" not in text
+    assert "cube(helper(1));" in text
+    assert "function helper(x) = x;" in text
+    assert "spare" not in text
+
+
+def test_a_name_used_only_by_a_nested_include_is_not_chosen_as_a_fresh_name(
+    tmp_path: Path,
+) -> None:
+    files = {
+        "m.scad": "use <b.scad>\nmodule m() {\n  include <i.scad>\n}\nm();\necho(norm([3, 4]));\n",
+        "b.scad": "use <a.scad>\nfunction bn(v) = norm(v);\n",
+        "a.scad": "function norm(v) = 99;\n",
+        "i.scad": "echo(bn([1]), norm_1);\n",
+    }
+    text = bundle_body(tmp_path, files).text
+    assert "function norm_1(" not in text

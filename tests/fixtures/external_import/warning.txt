@@ -1,0 +1,1 @@
+the bundle reads the external file

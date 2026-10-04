@@ -98,8 +98,8 @@ def test_a_shared_file_reports_only_the_targets_of_the_asking_namespace(tmp_path
         "b.scad": "include <s.scad>\n",
         "s.scad": "function f() = 1;\nfunction g() = f();\n",
     }
-    _, refs, found = streams(tmp_path, files)
-    index = RefIndex(refs)
+    graph, refs, found = streams(tmp_path, files)
+    index = RefIndex(refs, graph)
     for stream in found[:2]:
         g = definitions(stream)[Kind.FUNCTION, "g"].body
         (occurrence,) = index.occurrences(stream, g)

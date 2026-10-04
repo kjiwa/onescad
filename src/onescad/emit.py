@@ -4,7 +4,7 @@ statements re-sliced from source with only renamed tokens rewritten."""
 import os
 import re
 from bisect import bisect_left
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,7 +12,7 @@ from onescad import syntax as ast
 from onescad.customizer import HoistPlan
 from onescad.flatten import Definition, Entry, Piece, RefIndex, Stream, flatten_graph
 from onescad.lexer import TRIVIA, Kind, Token, lex
-from onescad.loader import Graph, SourceFile
+from onescad.loader import Graph, SourceFile, includes_in
 from onescad.rename import Renames, plan_renames
 from onescad.resolver import Kind as RefKind
 from onescad.resolver import Resolution, TopLevel
@@ -69,7 +69,7 @@ def leading_block(source: str) -> str:
 def emit(graph: Graph, refs: Resolution, plan: HoistPlan, roots: Sequence[Path]) -> Emission:
     """`roots` are the directories files are named relative to in `// onescad:` markers."""
     streams = flatten_graph(graph, plan)
-    index = RefIndex(refs)
+    index = RefIndex(refs, graph)
     main_file = graph.main.root
     hoisted = frozenset(TopLevel(main_file, RefKind.VARIABLE, p.name) for p in plan.params)
     kept = shake(streams, index, main_file)
@@ -132,8 +132,10 @@ class _Writer:
     def _note_contribution(self, stream: Stream, entry: Entry) -> None:
         pieces = entry.pieces if isinstance(entry, Definition) else (entry,)
         for piece in pieces:
-            if piece.source.path not in self.files and self._contributes(entry, piece):
-                self.files.append(piece.source.path)
+            if self._contributes(entry, piece):
+                for source in [piece.source, *self._index.nested_sources(piece)]:
+                    if source.path not in self.files:
+                        self.files.append(source.path)
         if isinstance(entry, Definition) and entry.key.kind is RefKind.VARIABLE and not stream.main:
             self.warnings.append(
                 f"{display_path(entry.head.source.path, self._roots)}: top-level variable "
@@ -169,21 +171,40 @@ class _Writer:
         end: int,
         extra: list[tuple[int, int, str]] | None = None,
     ) -> str:
+        return self._splice(stream, piece.source, start, end, includes_in([piece.stmt]), extra)
+
+    def _splice(
+        self,
+        stream: Stream,
+        source: SourceFile,
+        start: int,
+        end: int,
+        includes: Iterable[ast.Include],
+        extra: list[tuple[int, int, str]] | None = None,
+    ) -> str:
+        """`source[start:end]` with renamed tokens rewritten and every include inside the range
+        replaced by the included file, so the bundle needs no other file."""
         edits = list(extra or [])
-        for occurrence in self._index.occurrences(stream, piece):
+        for occurrence in self._index.within(stream, source.path, start, end):
             new = self._renames.new_name(occurrence)
             if new is not None:
                 edits.append(
                     (occurrence.ref.start, occurrence.ref.start + len(occurrence.ref.name), new)
                 )
-        text = piece.source.source
+        for include in includes:
+            if start <= include.start and include.end <= end:
+                target = self._index.target(source, include)
+                text = self._splice(
+                    stream, target, 0, len(target.source), includes_in(target.tree.stmts)
+                )
+                edits.append((include.start, include.end, text))
         out: list[str] = []
         pos = start
         for lo, hi, new in sorted(edits):
             if start <= lo and hi <= end:
-                out.extend((text[pos:lo], new))
+                out.extend((source.source[pos:lo], new))
                 pos = hi
-        out.append(text[pos:end])
+        out.append(source.source[pos:end])
         return "".join(out)
 
     def _leading(self, piece: Piece) -> str:
