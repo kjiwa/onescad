@@ -1,4 +1,6 @@
 import json
+import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -8,6 +10,7 @@ from helpers import HAS_OPENSCAD, write
 from onescad import cli
 from onescad.cli import main
 from onescad.errors import BundleError
+from onescad.paths import user_library_dir
 
 MODEL = "// A model.\nuse <lib.scad>\n/* [Size] */\nw = 10; // [1:20]\ncube(helper(w));\n"
 LIB = "function helper(x) = x * 2;\n"
@@ -15,8 +18,10 @@ PRESETS = {"parameterSets": {"big": {"w": "20", "$fn": "8"}}, "fileFormatVersion
 
 
 @pytest.fixture(autouse=True)
-def clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+def clean_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.delenv("OPENSCADPATH", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path / "home"))
 
 
 def model(tmp_path: Path, files: dict[str, str] | None = None) -> Path:
@@ -82,6 +87,14 @@ def test_openscadpath_is_searched_too(tmp_path: Path, monkeypatch: pytest.Monkey
     source = write(tmp_path / "src", {"m.scad": "use <lib.scad>\nx = helper(1);\n"})
     write(tmp_path / "libs", {"lib.scad": LIB})
     monkeypatch.setenv("OPENSCADPATH", str(tmp_path / "libs"))
+    assert main([str(source), "-o", str(tmp_path / "m.scad")]) == 0
+
+
+def test_user_library_dir_is_searched_too(tmp_path: Path) -> None:
+    source = write(tmp_path / "src", {"m.scad": "use <lib.scad>\nx = helper(1);\n"})
+    user_dir = user_library_dir(os.environ, sys.platform)
+    assert user_dir is not None
+    write(user_dir, {"lib.scad": LIB})
     assert main([str(source), "-o", str(tmp_path / "m.scad")]) == 0
 
 

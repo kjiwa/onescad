@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+Search OpenSCAD's user library directory after `OPENSCADPATH`, as OpenSCAD does.
+
 ## 0.2.0
 
 Add `--minify`, which strips comments and indentation from the bundle after the Customizer

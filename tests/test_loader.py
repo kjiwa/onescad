@@ -4,7 +4,7 @@ import pytest
 
 from onescad import syntax as ast
 from onescad.loader import Graph, LoadError, load
-from onescad.paths import library_dirs, resolve
+from onescad.paths import library_dirs, resolve, user_library_dir
 
 CORPUS = Path(__file__).parent / "corpus"
 
@@ -108,6 +108,28 @@ def test_library_dirs_and_search_order(tmp_path: Path) -> None:
 def test_library_dirs_splits_openscadpath() -> None:
     dirs = library_dirs([Path("l")], {"OPENSCADPATH": "a:b::c"})
     assert dirs == (Path("l"), Path("a"), Path("b"), Path("c"))
+
+
+@pytest.mark.parametrize(
+    ("platform", "environ", "expected"),
+    [
+        ("darwin", {"HOME": "/h"}, Path("/h/Documents/OpenSCAD/libraries")),
+        ("linux", {"HOME": "/h"}, Path("/h/.local/share/OpenSCAD/libraries")),
+        ("win32", {"USERPROFILE": "/u"}, Path("/u/Documents/OpenSCAD/libraries")),
+        ("darwin", {}, None),
+        ("linux", {}, None),
+        ("win32", {"HOME": "/h"}, None),
+    ],
+)
+def test_user_library_dir_per_platform(
+    platform: str, environ: dict[str, str], expected: Path | None
+) -> None:
+    assert user_library_dir(environ, platform) == expected
+
+
+def test_library_dirs_end_with_the_user_library_dir() -> None:
+    dirs = library_dirs([Path("l")], {"OPENSCADPATH": "a", "HOME": "/h"}, "linux")
+    assert dirs == (Path("l"), Path("a"), Path("/h/.local/share/OpenSCAD/libraries"))
 
 
 def test_nested_include_searches_its_own_directory_not_the_main_one(tmp_path: Path) -> None:

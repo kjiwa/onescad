@@ -36,9 +36,11 @@ Warnings print to stderr as `onescad: warning: <message>`. Errors print as `ones
 ## Search path
 
 `include` and `use` are resolved in this order: the including file's directory, each `-L`
-directory, then each `OPENSCADPATH` entry. OpenSCAD also searches the user and built-in library
-directories; onescad does not, so a bundle is the same on every machine. Put those libraries on
-`-L` or `OPENSCADPATH`. A missing file is an error that lists the directories searched.
+directory, each `OPENSCADPATH` entry, then OpenSCAD's user library directory
+(`~/Documents/OpenSCAD/libraries` on macOS, `%USERPROFILE%\Documents\OpenSCAD\libraries` on
+Windows, `~/.local/share/OpenSCAD/libraries` elsewhere). OpenSCAD's installation library (for
+example MCAD) is not searched; put it on `-L` or `OPENSCADPATH`. A missing file is an error that
+lists the directories searched.
 
 ## What gets bundled
 
