@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 Search OpenSCAD's user library directory after `OPENSCADPATH`, as OpenSCAD does.
 
