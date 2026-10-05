@@ -28,8 +28,10 @@ CONTROL_FILES = {"expected.scad", "error.txt", "libs", "warning.txt", "noverify"
 
 
 @pytest.fixture(autouse=True)
-def clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+def clean_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.delenv("OPENSCADPATH", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path / "home"))
 
 
 def stage(case: str, tmp_path: Path) -> Path:

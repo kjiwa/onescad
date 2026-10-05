@@ -1,14 +1,31 @@
-"""Include and use path resolution, restricted to what OpenSCAD searches reproducibly."""
+"""Include and use path resolution over the directories OpenSCAD searches."""
 
 import os
+import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 
-def library_dirs(extra: Sequence[Path], environ: Mapping[str, str]) -> tuple[Path, ...]:
-    """Explicit directories first, then OPENSCADPATH."""
+def user_library_dir(environ: Mapping[str, str], platform: str) -> Path | None:
+    """OpenSCAD's user library directory, or None when the home directory is unknown."""
+    if platform == "win32":
+        home = environ.get("USERPROFILE")
+        return Path(home) / "Documents" / "OpenSCAD" / "libraries" if home else None
+    home = environ.get("HOME")
+    if not home:
+        return None
+    if platform == "darwin":
+        return Path(home) / "Documents" / "OpenSCAD" / "libraries"
+    return Path(home) / ".local" / "share" / "OpenSCAD" / "libraries"
+
+
+def library_dirs(
+    extra: Sequence[Path], environ: Mapping[str, str], platform: str = sys.platform
+) -> tuple[Path, ...]:
+    """Explicit directories first, then OPENSCADPATH, then the user library directory."""
     from_env = [Path(p) for p in environ.get("OPENSCADPATH", "").split(os.pathsep) if p]
-    return (*extra, *from_env)
+    user = user_library_dir(environ, platform)
+    return (*extra, *from_env, *([user] if user else []))
 
 
 def search_dirs(including_dir: Path, libs: Sequence[Path]) -> tuple[Path, ...]:
