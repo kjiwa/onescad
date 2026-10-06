@@ -62,4 +62,4 @@ jobs:
       - run: uvx zizmor==1.30.1 .github/workflows
 
   privacy:
-    uses: kjiwa/.github/.github/workflows/privacy.yml@main
+    uses: kjiwa/.github/.github/workflows/privacy.yml@cb4151fa623dcc6c9e74b13b599173ebc69400c1 # main
