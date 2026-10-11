@@ -23,7 +23,8 @@ uv run pytest -m oracle --no-cov
 
 Each fixture under `tests/fixtures/<case>/` holds a `main.scad` and a golden `expected.scad`,
 or an `error.txt` for a case that must fail. Regenerate goldens with
-`ONESCAD_UPDATE_GOLDEN=1`. A defect found in review is fixed with a fixture or test for its
+`ONESCAD_UPDATE_GOLDEN=1`. A fixture built on the BOSL2 corpus carries `nogolden` instead of
+a golden, because its output follows upstream. A defect found in review is fixed with a fixture or test for its
 class, not only its instance.
 
 CI also runs `uv build`, `twine check`, and `zizmor` over the workflows.
