@@ -5,7 +5,8 @@ A fixture holds `main.scad` plus its helpers and one of:
   expected.scad  golden bundle without its version line
   error.txt      text the error message must contain; the bundle must fail
 Optional: `libs` (library dirs relative to the repo root, one per line), `warning.txt` (text a
-warning must contain), `noverify` (skip the openscad comparison).
+warning must contain), `noverify` (skip the openscad comparison), `nogolden` (no expected.scad;
+for output that follows an upstream library).
 Regenerate goldens with ONESCAD_UPDATE_GOLDEN=1.
 """
 
@@ -23,8 +24,9 @@ ROOT = Path(__file__).parent.parent
 CASES = sorted(p.name for p in FIXTURES.iterdir() if p.is_dir())
 BUNDLES = [c for c in CASES if not (FIXTURES / c / "error.txt").exists()]
 FAILURES = [c for c in CASES if (FIXTURES / c / "error.txt").exists()]
+GOLDEN = [c for c in BUNDLES if not (FIXTURES / c / "nogolden").exists()]
 VERIFIABLE = [c for c in BUNDLES if not (FIXTURES / c / "noverify").exists()]
-CONTROL_FILES = {"expected.scad", "error.txt", "libs", "warning.txt", "noverify"}
+CONTROL_FILES = {"expected.scad", "error.txt", "libs", "warning.txt", "noverify", "nogolden"}
 
 
 @pytest.fixture(autouse=True)
@@ -63,7 +65,7 @@ def body(bundle: Path) -> str:
     return bundle.read_text().split("\n", 1)[1]
 
 
-@pytest.mark.parametrize("case", BUNDLES)
+@pytest.mark.parametrize("case", GOLDEN)
 def test_the_bundle_matches_its_golden(case: str, tmp_path: Path) -> None:
     code, target = run(case, tmp_path, "dist")
     assert code == 0
