@@ -32,11 +32,13 @@ CI also runs `uv build`, `twine check`, and `zizmor` over the workflows.
 ## Releasing
 
 ```sh
-sh scripts/release.sh [--dry-run] <version>
+gh extension install kjiwa/gh-cut
+gh cut [--dry-run] <version>
 ```
 
 `<version>` is bare (`0.1.0`, not `v0.1.0`). Run it on a clean, synced `main` with `gh` and `uv`
-installed. The script runs the same checks CI runs, opens a `release-<version>` PR that sets the
+installed. [gh-cut](https://github.com/kjiwa/gh-cut) reads the version, bump, and checks from
+`scripts/release-hooks.sh`. It runs the same checks CI runs, opens a `release-<version>` PR that sets the
 version in `pyproject.toml`, `src/onescad/__init__.py`, and `uv.lock`, waits for its checks, and
 squash-merges it. GitHub signs the squash commit, so the release shows as Verified. It then
 tags the merged commit and creates the GitHub release from the matching `CHANGELOG.md` section;
@@ -44,7 +46,7 @@ add a `## <version>` heading there first. If the bump is already on `main`, it s
 only tags and releases, so a run that stopped after the merge can be repeated. `--dry-run` runs
 every check and prints each mutating command instead of running it.
 
-The release event triggers `publish.yml`, which re-runs `scripts/check-release.sh` (the tag, its
+The release event triggers `publish.yml`, which re-runs `gh cut check` (the tag, its
 title, and the `CHANGELOG.md` heading must all agree) before building and publishing to PyPI
 through a trusted publisher.
 
