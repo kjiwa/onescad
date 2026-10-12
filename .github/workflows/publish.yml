@@ -14,7 +14,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: sh scripts/check-release.sh "$RELEASE_TAG" "$RELEASE_NAME"
+      - run: gh extension install kjiwa/gh-cut --pin d17eeca38dd7cdd01f0eecde2c5923487ea1ad80
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - run: gh cut check "$RELEASE_TAG" "$RELEASE_NAME"
   publish:
     needs: verify
     runs-on: ubuntu-latest
